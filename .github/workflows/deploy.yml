@@ -1,0 +1,60 @@
+name: Deploy to Website
+
+on:
+  push:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "deploy"
+  cancel-in-progress: false
+
+jobs:
+  # Deployment job
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Erno
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build with base path
+        run: npm run build -- --base=/apps/erno/
+
+      - name: Checkout website repo
+        uses: actions/checkout@v6
+        with:
+          repository: yaacoub/yaacoub.github.io
+          token: ${{ secrets.WEBSITE_TOKEN }}
+          path: website
+
+      - name: Copy build to website
+        run: |
+          mkdir -p website/apps/erno
+          rm -rf website/apps/erno/*
+          cp -r dist/* website/apps/erno/
+
+      - name: Commit and push to website
+        working-directory: website
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/erno
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update apps/erno"
+            git push
+          fi

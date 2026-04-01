@@ -1,0 +1,22 @@
+{
+  "name": "erno",
+  "version": "0.1.0-alpha",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yaacoub/Erno"
+  },
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "cubejs": "^1.1.0"
+  },
+  "devDependencies": {
+    "vite": "^7.1.9"
+  }
+}
