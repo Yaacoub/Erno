@@ -41,6 +41,7 @@ const patterns = [
   { id: "six-spots", name: "Six Spots", algorithm: "U D' R L' F B' U D'" },
   { id: "see-you-around", name: "See You Around (C U Around)", algorithm: "U' B2 U L2 D L2 R2 D' B' R D' L R' B2 U2 F' L' U'" },
   { id: "spicy", name: "Displaced Motif", algorithm: "L2 B2 D' B2 D L2 U R2 D R2 B U R' F2 R U' B' U'" },
+  { id: "superflip", name: "Superflip", algorithm: "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2" },
   { id: "3c3w", name: "3C3W Pattern", algorithm: "D L B' L L F L' B' U D' R L' F B D L'" },
   { id: "custom", name: "Custom", algorithm: "" }
 ];
