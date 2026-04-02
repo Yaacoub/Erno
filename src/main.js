@@ -49,6 +49,7 @@ const patterns = [
 let solverReady = false;
 
 const state = {
+  wizardStep: 1,
   sourceState: solvedStateString.split(""),
   targetPattern: patterns[0],
   targetState: applyAlgorithmToSolved(patterns[0].algorithm).split(""),
@@ -65,88 +66,106 @@ const app = document.querySelector("#app");
 app.innerHTML = `
   <main class="layout">
     <header class="hero">
-      <div class="hero-title-row">
-        <h1>Erno</h1>
-        <span class="alpha-tag">Alpha</span>
+      <div class="hero-left">
+        <div style="display: flex; align-items: baseline; gap: var(--s);">
+          <h1>Erno</h1>
+          <span class="alpha-tag">Alpha</span>
+        </div>
+        <p>Turn your 3x3 Rubik's cube into a pattern by following step-by-step moves.</p>
       </div>
-      <p>Easily transform your current cube into a custom pattern with step-by-step visual guidance.</p>
+      <div class="header-links">
+        <a href="https://github.com/yaacoub/Erno" target="_blank" rel="noopener noreferrer">Source</a>
+        <span aria-hidden="true">•</span>
+        <a href="https://github.com/yaacoub/Erno/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+      </div>
     </header>
 
-    <div class="top-grid">
-      <section class="section-block controls compact-section">
+    <div class="stepper" aria-hidden="true" id="wizardStepper">
+      <div class="step-indicator active" data-ind="1"><span>1</span> Input</div>
+      <div class="step-indicator" data-ind="2"><span>2</span> Pattern</div>
+      <div class="step-indicator" data-ind="3"><span>3</span> Complete</div>
+    </div>
+
+    <div class="wizard-container">
+      <section id="step1" class="section-block controls compact-section wizard-step card" data-step="1">
         <h2>1. Input Your Cube</h2>
         <p>Paste a scramble, pick a preset, or paint stickers manually.</p>
         <div class="row">
           <input id="scrambleInput" type="text" placeholder="Example: R U R' U' F2" aria-label="Scramble notation" />
-          <button id="applyScramble" class="btn-primary">Apply</button>
+          <button id="applyScramble" class="btn-secondary">Apply</button>
         </div>
         <div class="row paint-controls-row">
           <div id="paintPalette" class="palette"></div>
-          <button id="setSolved">Solved</button>
-          <button id="setRandom">Random</button>
+          <button id="setSolved" class="btn-secondary">Solved</button>
+          <button id="setRandom" class="btn-secondary">Random</button>
         </div>
         <div class="source-cube-wrap">
           <div id="sourceCube" class="cube-net"></div>
         </div>
       </section>
 
-      <section class="section-block controls compact-section">
+      <section id="step2" class="section-block controls compact-section wizard-step card" data-step="2">
         <h2>2. Choose Target Pattern</h2>
         <p>Select a predefined final pattern, or manually paint stickers.</p>
         <div class="row">
           <select id="patternSelect"></select>
-          <button id="generate" class="btn-primary">Generate</button>
         </div>
         <div class="row paint-controls-row">
           <div id="targetPaintPalette" class="palette"></div>
-          <button id="setTargetSolved">Solved</button>
-          <button id="setTargetRandom">Random</button>
+          <button id="setTargetSolved" class="btn-secondary">Solved</button>
+          <button id="setTargetRandom" class="btn-secondary">Random</button>
         </div>
         <div class="target-preview-wrap">
           <div id="targetCube" class="cube-net"></div>
         </div>
       </section>
+
+      <section id="step3" class="section-block controls output walkthrough-block wizard-step card" data-step="3">
+        <h2>3. Follow the Moves</h2>
+        <p>Follow the sequence step-by-step to reach the target pattern.</p>
+        <div class="walkthrough-preview-wrap">
+          <div id="walkthroughCube" class="cube-net"></div>
+        </div>
+        <div id="algorithmOutput" class="algorithm-box" aria-live="polite"></div>
+        
+        <details class="help-details">
+          <summary>
+            <span style="padding-left: 6px;">What do these letters mean?</span>
+          </summary>
+          <div class="help-content">
+             <p class="hint">Current result is fast and correct, but not always the shortest possible sequence.</p>
+             <div class="notation">
+               <p><strong>U</strong> = Up, <strong>R</strong> = Right, <strong>F</strong> = Front, <strong>D</strong> = Down, <strong>L</strong> = Left, <strong>B</strong> = Back.</p>
+               <p>No suffix = clockwise quarter-turn, <strong>'</strong> = counter-clockwise quarter-turn, <strong>2</strong> = half-turn (180 degrees).</p>
+             </div>
+          </div>
+        </details>
+
+        <div class="row buttons-row walkthrough-buttons">
+          <button id="resetWalkthrough" class="nav-btn btn-secondary icon-btn" title="Reset to start" aria-label="Reset to start">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M19 5.5L10 12l9 6.5zM7 5h2v14H7z"/>
+            </svg>
+          </button>
+          <button id="prevMove" class="nav-btn btn-secondary icon-btn" title="Previous Move" aria-label="Previous move">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M15 18l-8-6 8-6z"/>
+            </svg>
+          </button>
+          <button id="nextMove" class="btn-primary nav-btn icon-btn" title="Next Move" aria-label="Next Move">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M9 6l8 6-8 6z"/>
+            </svg>
+          </button>
+        </div>
+      </section>
     </div>
 
-    <section class="section-block controls output walkthrough-block">
-      <h2>3. Follow the Moves</h2>
-      <p>Follow the sequence step-by-step to reach the target pattern.</p>
-      <div class="walkthrough-preview-wrap">
-        <div id="walkthroughCube" class="cube-net"></div>
-      </div>
-      <div id="algorithmOutput" class="algorithm-box" aria-live="polite"></div>
-      <p class="hint">Current result is fast and correct, but not always the shortest possible sequence.</p>
-      <div class="notation">
-        <p><strong>U</strong> = Up, <strong>R</strong> = Right, <strong>F</strong> = Front, <strong>D</strong> = Down, <strong>L</strong> = Left, <strong>B</strong> = Back.</p>
-        <p>No suffix = clockwise quarter-turn, <strong>'</strong> = counter-clockwise quarter-turn, <strong>2</strong> = half-turn (180 degrees).</p>
-      </div>
-      <div class="row buttons-row walkthrough-buttons">
-        <button id="resetWalkthrough" class="nav-btn" title="Reset to start">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M19 5.5L10 12l9 6.5zM7 5h2v14H7z"/>
-          </svg>
-          Reset
-        </button>
-        <button id="prevMove" class="nav-btn" title="Previous Move">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M15 18l-8-6 8-6z"/>
-          </svg>
-          Prev
-        </button>
-        <button id="nextMove" class="btn-primary nav-btn" title="Next Move">
-          Next
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-            <path d="M9 6l8 6-8 6z"/>
-          </svg>
-        </button>
-      </div>
-    </section>
+    <div class="wizard-nav" id="wizardNav">
+      <button id="wizardPrev" class="btn-secondary">Previous</button>
+      <button id="wizardNext" class="btn-primary">Next</button>
+    </div>
 
-    <footer class="site-footer" aria-label="Project links">
-      <a href="https://github.com/yaacoub/Erno" target="_blank" rel="noopener noreferrer">Source</a>
-      <span aria-hidden="true">•</span>
-      <a href="https://github.com/yaacoub/Erno/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
-    </footer>
   </main>
 `;
 
@@ -158,7 +177,8 @@ const patternSelectEl = document.querySelector("#patternSelect");
 const algorithmOutputEl = document.querySelector("#algorithmOutput");
 const paintPaletteEl = document.querySelector("#paintPalette");
 const targetPaintPaletteEl = document.querySelector("#targetPaintPalette");
-const generateBtnEl = document.querySelector("#generate");
+const wizardPrevBtn = document.querySelector("#wizardPrev");
+const wizardNextBtn = document.querySelector("#wizardNext");
 
 const sourceStatusEl = document.createElement("p");
 sourceStatusEl.id = "sourceValidity";
@@ -208,10 +228,30 @@ bind("#setTargetRandom", "click", () => {
   clearSolution();
   renderAll();
 });
-bind("#generate", "click", generateMoves);
 bind("#prevMove", "click", prevMove);
 bind("#nextMove", "click", nextMove);
 bind("#resetWalkthrough", "click", resetWalkthrough);
+
+bind("#wizardPrev", "click", () => {
+  if (state.wizardStep > 1) {
+    if (state.wizardStep === 3) {
+      clearSolution();
+    }
+    state.wizardStep--;
+    renderAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
+
+bind("#wizardNext", "click", () => {
+  if (state.wizardStep === 2) {
+    generateMoves();
+  } else if (state.wizardStep < 2) {
+    state.wizardStep++;
+    renderAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+});
 
 patternSelectEl.addEventListener("change", () => {
   state.targetPattern = patterns.find((p) => p.id === patternSelectEl.value) || patterns[0];
@@ -264,9 +304,11 @@ function buildPatternSelect() {
 }
 
 function applyScramble() {
-  const text = scrambleInputEl.value.trim();
-  state.sourceScrambleText = text;
-  if (!text) {
+  const text = scrambleInputEl.value;
+  const formattedText = text.replace(/\s+/g, '').replace(/([UuRrFfDdLlBb][2']?)/g, '$1 ').trim().toUpperCase();
+  scrambleInputEl.value = formattedText;
+  state.sourceScrambleText = formattedText;
+  if (!formattedText) {
     state.error = "Enter a scramble first.";
     renderAll();
     return;
@@ -274,7 +316,7 @@ function applyScramble() {
 
   try {
     const cube = new Cube();
-    cube.move(text);
+    cube.move(formattedText);
     state.sourceState = cube.asString().split("");
     state.error = "";
     clearSolution();
@@ -390,6 +432,55 @@ function validateState(str) {
   }
 }
 
+
+// ── Optimizer: cancels adjacent inverse / double-turn pairs ─────────────────
+function cancelMoves(algorithm) {
+  if (!algorithm) return algorithm;
+  const moves = algorithm.trim().split(/\s+/);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < moves.length - 1; i++) {
+      const a = moves[i], b = moves[i + 1];
+      if (!a || !b) continue;
+      const faceA = a[0], faceB = b[0];
+      if (faceA !== faceB) continue;
+      const modA = a.slice(1) || "1", modB = b.slice(1) || "1";
+      const val = (modA === "2" ? 2 : modA === "'" ? 3 : 1) +
+                  (modB === "2" ? 2 : modB === "'" ? 3 : 1);
+      const combined = val % 4;
+      const replacement = combined === 0 ? null
+        : combined === 1 ? faceA
+        : combined === 2 ? faceA + "2"
+        : faceA + "'";
+      moves.splice(i, 2, ...(replacement ? [replacement] : []));
+      changed = true;
+      break;
+    }
+  }
+  return moves.filter(Boolean).join(" ");
+}
+
+// ── Single solver attempt ────────────────────────────────────────────────────
+function solveSingle(sourceStr, targetStr) {
+  ensureSolver();
+  const sourceCube = Cube.fromString(sourceStr);
+  const targetCube = Cube.fromString(targetStr);
+  const sourceToSolved = sourceCube.solve();
+  const solvedToTarget = Cube.inverse(targetCube.solve());
+  const composed = joinAlgorithms(sourceToSolved, solvedToTarget);
+  const transitionCube = new Cube();
+  if (composed) transitionCube.move(composed);
+  let result = Cube.inverse(transitionCube.solve()).trim();
+  if (!doesAlgorithmReachTarget(sourceStr, result, targetStr)) {
+    result = composed;
+  }
+  if (!doesAlgorithmReachTarget(sourceStr, result, targetStr)) {
+    throw new Error("Solver produced invalid result.");
+  }
+  return cancelMoves(result);
+}
+
 function generateMoves() {
   state.error = "";
 
@@ -400,7 +491,7 @@ function generateMoves() {
     renderAll();
     return;
   }
-  
+
   const targetStr = state.targetState.join("");
   const targetValidation = validateState(targetStr);
   if (!targetValidation.valid) {
@@ -409,35 +500,21 @@ function generateMoves() {
     return;
   }
 
+  if (sourceStr === targetStr) {
+    state.error = "Source and target are identical — nothing to do.";
+    renderAll();
+    return;
+  }
+
   try {
-    ensureSolver();
-    const sourceCube = Cube.fromString(sourceStr);
-    const targetCube = Cube.fromString(targetStr);
-
-    const sourceToSolved = sourceCube.solve();
-    const solvedToTarget = Cube.inverse(targetCube.solve());
-
-    // Build the source->target transform and then re-solve that state directly.
-    const sourceToTargetViaState = joinAlgorithms(sourceToSolved, solvedToTarget);
-    const transitionCube = new Cube();
-    if (sourceToTargetViaState) {
-      transitionCube.move(sourceToTargetViaState);
-    }
-    let final = Cube.inverse(transitionCube.solve()).trim();
-    if (!doesAlgorithmReachTarget(sourceStr, final, targetStr)) {
-      // Fallback to the direct composition when solver simplification does not preserve the exact target.
-      final = sourceToTargetViaState;
-    }
-
-    if (!doesAlgorithmReachTarget(sourceStr, final, targetStr)) {
-      throw new Error("Generated algorithm did not reproduce target state.");
-    }
-
-    state.finalAlgorithm = final;
-    state.moveTokens = tokenize(final);
+    const best = solveSingle(sourceStr, targetStr);
+    state.finalAlgorithm = best;
+    state.moveTokens = tokenize(best);
     state.walkthroughIndex = 0;
     state.walkthroughState = state.sourceState.slice();
+    state.wizardStep = 3;
     renderAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   } catch {
     state.error = "Cube state is invalid or unsolvable. Reset to Solved or apply a valid scramble.";
     renderAll();
@@ -529,8 +606,6 @@ function renderAll() {
   targetStatusEl.classList.toggle("valid", targetValidation.valid);
   targetStatusEl.classList.toggle("invalid", !targetValidation.valid);
 
-  generateBtnEl.disabled = !(sourceValidation.valid && targetValidation.valid);
-
   renderCubeNet(sourceCubeEl, state.sourceState, true, null, "paintFace");
   renderCubeNet(targetCubeEl, state.targetState, true, null, "targetPaintFace");
 
@@ -539,6 +614,38 @@ function renderAll() {
   renderCubeNet(walkthroughCubeEl, state.walkthroughState, false, activeFace, null);
 
   renderAlgorithmOutput();
+  renderWizard(sourceValidation.valid, targetValidation.valid);
+}
+
+function renderWizard(sourceValid, targetValid) {
+  document.querySelectorAll(".wizard-step").forEach(el => {
+    // Force reflow for transform transition if needed, but display logic first
+    if (parseInt(el.dataset.step, 10) === state.wizardStep) {
+      el.classList.add("active");
+    } else {
+      el.classList.remove("active");
+    }
+  });
+
+  document.querySelectorAll(".step-indicator").forEach(el => {
+    el.classList.toggle("active", parseInt(el.dataset.ind, 10) === state.wizardStep);
+    el.classList.toggle("completed", parseInt(el.dataset.ind, 10) < state.wizardStep);
+  });
+  
+  wizardPrevBtn.style.visibility = state.wizardStep === 1 ? "hidden" : "visible";
+  
+  if (state.wizardStep === 3) {
+    wizardNextBtn.style.display = "none";
+  } else {
+    wizardNextBtn.style.display = "inline-flex";
+    if (state.wizardStep === 1) {
+      wizardNextBtn.textContent = "Next";
+      wizardNextBtn.disabled = !sourceValid;
+    } else if (state.wizardStep === 2) {
+      wizardNextBtn.textContent = "Generate Steps";
+      wizardNextBtn.disabled = !targetValid;
+    }
+  }
 }
 
 function renderAlgorithmOutput() {
