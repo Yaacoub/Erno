@@ -59,6 +59,11 @@ const state = {
   moveTokens: [],
   walkthroughIndex: 0,
   walkthroughState: solvedStateString.split(""),
+  sourceValidationStatus: "idle",
+  sourceValidationMessage: "We'll check this cube when you click Next.",
+  targetValidationStatus: "idle",
+  targetValidationMessage: "We'll check this pattern when you click Generate Steps.",
+  step3ViewMode: "2d",
   error: ""
 };
 
@@ -74,9 +79,7 @@ app.innerHTML = `
         <p>Turn your 3x3 Rubik's cube into a pattern by following step-by-step moves.</p>
       </div>
       <div class="header-links">
-        <a href="https://github.com/yaacoub/Erno" target="_blank" rel="noopener noreferrer">Source</a>
-        <span aria-hidden="true">•</span>
-        <a href="https://github.com/yaacoub/Erno/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">MIT License</a>
+        <a href="https://github.com/yaacoub/Erno" target="_blank" rel="noopener noreferrer">GitHub</a>
       </div>
     </header>
 
@@ -101,6 +104,7 @@ app.innerHTML = `
         </div>
         <div class="source-cube-wrap">
           <div id="sourceCube" class="cube-net"></div>
+          <p id="sourceValidity" class="validity-line idle">We'll check this cube when you click Next.</p>
         </div>
       </section>
 
@@ -117,14 +121,18 @@ app.innerHTML = `
         </div>
         <div class="target-preview-wrap">
           <div id="targetCube" class="cube-net"></div>
+          <p id="targetValidity" class="validity-line idle">We'll check this pattern when you click Generate Steps.</p>
         </div>
       </section>
 
       <section id="step3" class="section-block controls output walkthrough-block wizard-step card" data-step="3">
-        <h2>3. Follow the Moves</h2>
+        <div class="step-heading-row">
+          <h2>3. Follow the Moves</h2>
+          <button id="toggleStep3View" class="btn-secondary preview-toggle-btn" type="button">Switch to 3D</button>
+        </div>
         <p>Follow the sequence step-by-step to reach the target pattern.</p>
         <div class="walkthrough-preview-wrap">
-          <div id="walkthroughCube" class="cube-net"></div>
+          <div id="walkthroughCube" class="walkthrough-preview-surface"></div>
         </div>
         <div id="algorithmOutput" class="algorithm-box" aria-live="polite"></div>
         
@@ -179,18 +187,9 @@ const paintPaletteEl = document.querySelector("#paintPalette");
 const targetPaintPaletteEl = document.querySelector("#targetPaintPalette");
 const wizardPrevBtn = document.querySelector("#wizardPrev");
 const wizardNextBtn = document.querySelector("#wizardNext");
-
-const sourceStatusEl = document.createElement("p");
-sourceStatusEl.id = "sourceValidity";
-sourceStatusEl.className = "validity-line";
-sourceStatusEl.setAttribute("aria-live", "polite");
-sourceCubeEl.parentElement.appendChild(sourceStatusEl);
-
-const targetStatusEl = document.createElement("p");
-targetStatusEl.id = "targetValidity";
-targetStatusEl.className = "validity-line";
-targetStatusEl.setAttribute("aria-live", "polite");
-targetCubeEl.parentElement.appendChild(targetStatusEl);
+const sourceStatusEl = document.querySelector("#sourceValidity");
+const targetStatusEl = document.querySelector("#targetValidity");
+const toggleStep3ViewBtn = document.querySelector("#toggleStep3View");
 
 state.targetPaintFace = "U"; // Initial paint face for target
 buildPalette(paintPaletteEl, "paintFace");
@@ -203,6 +202,8 @@ bind("#applyScramble", "click", applyScramble);
 bind("#setSolved", "click", () => {
   state.sourceState = solvedStateString.split("");
   state.sourceScrambleText = "";
+  resetValidationState("source");
+  state.error = "";
   clearSolution();
   renderAll();
 });
@@ -210,6 +211,8 @@ bind("#setRandom", "click", () => {
   const random = Cube.random();
   state.sourceState = random.asString().split("");
   state.sourceScrambleText = "";
+  resetValidationState("source");
+  state.error = "";
   clearSolution();
   renderAll();
 });
@@ -217,6 +220,8 @@ bind("#setTargetSolved", "click", () => {
   state.targetState = solvedStateString.split("");
   state.targetPattern = patterns.find((p) => p.id === "custom");
   patternSelectEl.value = "custom";
+  resetValidationState("target");
+  state.error = "";
   clearSolution();
   renderAll();
 });
@@ -225,12 +230,15 @@ bind("#setTargetRandom", "click", () => {
   state.targetState = random.asString().split("");
   state.targetPattern = patterns.find((p) => p.id === "custom");
   patternSelectEl.value = "custom";
+  resetValidationState("target");
+  state.error = "";
   clearSolution();
   renderAll();
 });
 bind("#prevMove", "click", prevMove);
 bind("#nextMove", "click", nextMove);
 bind("#resetWalkthrough", "click", resetWalkthrough);
+bind("#toggleStep3View", "click", toggleStep3View);
 
 bind("#wizardPrev", "click", () => {
   if (state.wizardStep > 1) {
@@ -244,12 +252,22 @@ bind("#wizardPrev", "click", () => {
 });
 
 bind("#wizardNext", "click", () => {
-  if (state.wizardStep === 2) {
-    generateMoves();
-  } else if (state.wizardStep < 2) {
+  if (state.wizardStep === 1) {
+    const sourceValidation = validateState(state.sourceState.join(""));
+    setValidationState("source", sourceValidation);
+
+    if (!sourceValidation.valid) {
+      state.error = `Input cube state is invalid: ${sourceValidation.reason}.`;
+      renderAll();
+      return;
+    }
+
+    state.error = "";
     state.wizardStep++;
     renderAll();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  } else if (state.wizardStep === 2) {
+    generateMoves();
   }
 });
 
@@ -258,6 +276,8 @@ patternSelectEl.addEventListener("change", () => {
   if (state.targetPattern.id !== "custom" && state.targetPattern.algorithm !== null) {
     state.targetState = applyAlgorithmToSolved(state.targetPattern.algorithm).split("");
   }
+  resetValidationState("target");
+  state.error = "";
   clearSolution();
   renderAll();
 });
@@ -318,6 +338,7 @@ function applyScramble() {
     const cube = new Cube();
     cube.move(formattedText);
     state.sourceState = cube.asString().split("");
+    resetValidationState("source");
     state.error = "";
     clearSolution();
     renderAll();
@@ -432,6 +453,24 @@ function validateState(str) {
   }
 }
 
+function resetValidationState(kind) {
+  const defaults = {
+    source: "We'll check this cube when you click Next.",
+    target: "We'll check this pattern when you click Generate Steps."
+  };
+
+  state[`${kind}ValidationStatus`] = "idle";
+  state[`${kind}ValidationMessage`] = defaults[kind];
+}
+
+function setValidationState(kind, validation) {
+  const label = kind === "source" ? "Cube" : "Pattern";
+  state[`${kind}ValidationStatus`] = validation.valid ? "valid" : "invalid";
+  state[`${kind}ValidationMessage`] = validation.valid
+    ? `${label} looks solvable.`
+    : `${label} needs attention: ${validation.reason}.`;
+}
+
 
 // ── Optimizer: cancels adjacent inverse / double-turn pairs ─────────────────
 function cancelMoves(algorithm) {
@@ -486,6 +525,7 @@ function generateMoves() {
 
   const sourceStr = state.sourceState.join("");
   const sourceValidation = validateState(sourceStr);
+  setValidationState("source", sourceValidation);
   if (!sourceValidation.valid) {
     state.error = `Input cube state is invalid: ${sourceValidation.reason}.`;
     renderAll();
@@ -494,6 +534,7 @@ function generateMoves() {
 
   const targetStr = state.targetState.join("");
   const targetValidation = validateState(targetStr);
+  setValidationState("target", targetValidation);
   if (!targetValidation.valid) {
     state.error = `Target pattern state is invalid: ${targetValidation.reason}.`;
     renderAll();
@@ -583,6 +624,11 @@ function resetWalkthrough() {
   renderAll();
 }
 
+function toggleStep3View() {
+  state.step3ViewMode = state.step3ViewMode === "2d" ? "3d" : "2d";
+  renderAll();
+}
+
 function clearSolution() {
   state.finalAlgorithm = "";
   state.moveTokens = [];
@@ -591,33 +637,45 @@ function clearSolution() {
 }
 
 function renderAll() {
-  const sourceValidation = validateState(state.sourceState.join(""));
-  const targetValidation = validateState(state.targetState.join(""));
-
-  sourceStatusEl.textContent = sourceValidation.valid
-    ? "Source state is valid."
-    : `Source state invalid: ${sourceValidation.reason}.`;
-  sourceStatusEl.classList.toggle("valid", sourceValidation.valid);
-  sourceStatusEl.classList.toggle("invalid", !sourceValidation.valid);
-
-  targetStatusEl.textContent = targetValidation.valid
-    ? "Target state is valid."
-    : `Target state invalid: ${targetValidation.reason}.`;
-  targetStatusEl.classList.toggle("valid", targetValidation.valid);
-  targetStatusEl.classList.toggle("invalid", !targetValidation.valid);
+  renderValidationMessage(sourceStatusEl, state.sourceValidationStatus, state.sourceValidationMessage);
+  renderValidationMessage(targetStatusEl, state.targetValidationStatus, state.targetValidationMessage);
 
   renderCubeNet(sourceCubeEl, state.sourceState, true, null, "paintFace");
   renderCubeNet(targetCubeEl, state.targetState, true, null, "targetPaintFace");
 
   const upcomingMove = state.moveTokens[state.walkthroughIndex] || "";
   const activeFace = upcomingMove ? upcomingMove[0] : null;
-  renderCubeNet(walkthroughCubeEl, state.walkthroughState, false, activeFace, null);
+  renderWalkthroughPreview(activeFace);
 
   renderAlgorithmOutput();
-  renderWizard(sourceValidation.valid, targetValidation.valid);
+  renderWizard();
 }
 
-function renderWizard(sourceValid, targetValid) {
+function renderWalkthroughPreview(activeFace) {
+  const isThreeDimensional = state.step3ViewMode === "3d";
+  toggleStep3ViewBtn.textContent = isThreeDimensional ? "Switch to 2D" : "Switch to 3D";
+  toggleStep3ViewBtn.setAttribute("aria-pressed", String(isThreeDimensional));
+
+  walkthroughCubeEl.classList.toggle("is-3d", isThreeDimensional);
+  walkthroughCubeEl.classList.toggle("is-2d", !isThreeDimensional);
+
+  if (isThreeDimensional) {
+    walkthroughCubeEl.classList.remove("cube-net", "interactive-net", "static-net");
+    walkthroughCubeEl.innerHTML = buildThreeDimensionalCube(state.walkthroughState, activeFace, activeFace || "F");
+    return;
+  }
+
+  renderCubeNet(walkthroughCubeEl, state.walkthroughState, false, activeFace, null);
+}
+
+function renderValidationMessage(element, status, message) {
+  element.textContent = message;
+  element.classList.toggle("idle", status === "idle");
+  element.classList.toggle("valid", status === "valid");
+  element.classList.toggle("invalid", status === "invalid");
+}
+
+function renderWizard() {
   document.querySelectorAll(".wizard-step").forEach(el => {
     // Force reflow for transform transition if needed, but display logic first
     if (parseInt(el.dataset.step, 10) === state.wizardStep) {
@@ -640,21 +698,14 @@ function renderWizard(sourceValid, targetValid) {
     wizardNextBtn.style.display = "inline-flex";
     if (state.wizardStep === 1) {
       wizardNextBtn.textContent = "Next";
-      wizardNextBtn.disabled = !sourceValid;
     } else if (state.wizardStep === 2) {
       wizardNextBtn.textContent = "Generate Steps";
-      wizardNextBtn.disabled = !targetValid;
     }
+    wizardNextBtn.disabled = false;
   }
 }
 
 function renderAlgorithmOutput() {
-  if (state.error) {
-    const errorMsg = state.error;
-    setTimeout(() => alert(errorMsg), 10);
-    state.error = "";
-  }
-
   if (!state.moveTokens.length) {
     algorithmOutputEl.textContent = "Move sequence appears here...";
     return;
@@ -674,8 +725,51 @@ function renderAlgorithmOutput() {
   algorithmOutputEl.innerHTML = sequenceHtml;
 }
 
+function buildThreeDimensionalCube(stickers, activeFace, viewFace) {
+  const cubeFaces = faces.map((face, faceIndex) => {
+    const faceStickers = stickers.slice(faceIndex * 9, (faceIndex + 1) * 9);
+    const faceMarkup = faceStickers
+      .map((stickerFace, stickerIndex) => {
+        const isCenterSticker = stickerIndex === 4;
+        return `
+          <span
+            class="cube-3d-sticker${isCenterSticker ? " center" : ""}"
+            style="background:${colorHexByFace[stickerFace] || "#808080"}"
+          >${isCenterSticker ? face : ""}</span>
+        `;
+      })
+      .join("");
+
+    return `
+      <div class="cube-3d-face cube-3d-face--${face.toLowerCase()}${activeFace === face ? " active" : ""}">
+        ${faceMarkup}
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="cube-scene">
+      <div class="cube-3d" style="--cube-view:${getCubeViewTransform(viewFace)}">
+        ${cubeFaces}
+      </div>
+    </div>
+  `;
+}
+
+function getCubeViewTransform(face) {
+  return {
+    U: "rotateX(-118deg) rotateY(-45deg)",
+    R: "rotateX(-24deg) rotateY(-132deg)",
+    F: "rotateX(-24deg) rotateY(-42deg)",
+    D: "rotateX(62deg) rotateY(-42deg)",
+    L: "rotateX(-24deg) rotateY(48deg)",
+    B: "rotateX(-24deg) rotateY(138deg)"
+  }[face] || "rotateX(-24deg) rotateY(-42deg)";
+}
+
 function renderCubeNet(container, stickers, interactive, activeFace, paintStateProp) {
   container.innerHTML = "";
+  container.classList.add("cube-net");
   container.classList.toggle("interactive-net", interactive);
   container.classList.toggle("static-net", !interactive);
   faces.forEach((face, faceIndex) => {
@@ -702,6 +796,8 @@ function renderCubeNet(container, stickers, interactive, activeFace, paintStateP
       if (interactive && !isCenterSticker) {
         sticker.addEventListener("click", () => {
           stickers[(faceIndex * 9) + i] = state[paintStateProp];
+          resetValidationState(paintStateProp === "targetPaintFace" ? "target" : "source");
+          state.error = "";
           if (paintStateProp === "targetPaintFace") {
             state.targetPattern = patterns.find((p) => p.id === "custom");
             patternSelectEl.value = "custom";

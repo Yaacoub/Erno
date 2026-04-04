@@ -1,0 +1,55 @@
+name: Create GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "release"
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Erno with tags
+        uses: actions/checkout@v6
+        with:
+            fetch-depth: 0 # fetch all history and tags
+
+      - name: Create tag and release from commit title
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          # Safely get the first line of the latest commit message directly from Git
+          release_title="$(git log -1 --pretty=%s)"
+          
+          # Trim leading/trailing whitespace
+          release_title="$(printf '%s' "$release_title" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
+          # Sanitize the title to create a valid Git tag (replaces spaces with hyphens)
+          tag_name="$(printf '%s' "$release_title" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+
+          prerelease_flag=""
+          release_title_lower="$(printf '%s' "$release_title" | tr '[:upper:]' '[:lower:]')"
+          if [[ "$release_title_lower" == *alpha* || "$release_title_lower" == *beta* ]]; then
+            prerelease_flag="--prerelease"
+          fi
+
+          # Create the release using the sanitized tag_name, but keeps the readable release_title
+          gh release create "$tag_name" \
+            --target "${{ github.sha }}" \
+            --title "$release_title" \
+            --generate-notes \
+            $prerelease_flag
