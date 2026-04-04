@@ -51,5 +51,4 @@ jobs:
           gh release create "$tag_name" \
             --target "${{ github.sha }}" \
             --title "$release_title" \
-            --generate-notes \
             $prerelease_flag
